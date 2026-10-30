@@ -208,6 +208,21 @@
     .gb-name { font-weight: 700; }
     .gb-time { font-size: .82rem; color: var(--muted); }
     .gb-text { color: var(--ink); word-break: break-word; white-space: pre-wrap; }
+    .gb-summary { margin-bottom: 20px; }
+    .gb-summary-btn {
+      border: 1px solid var(--accent-soft); background: var(--surface); color: var(--accent);
+      font: inherit; font-weight: 700; cursor: pointer; padding: 10px 22px;
+    }
+    .gb-summary-btn:hover { background: var(--accent-soft); transform: translateY(-1px); }
+    .gb-summary-btn:disabled { opacity: .6; cursor: wait; transform: none; }
+    .gb-summary-text {
+      margin-top: 12px; padding: 16px 20px; border-radius: 18px;
+      background: linear-gradient(135deg, #fff1e4, #fde6d6);
+      border: 1px solid var(--accent-soft); color: var(--ink);
+      animation: pop .4s ease;
+    }
+    .gb-summary-text.error { background: #fbe9e4; border-color: #f2c4b8; color: #b8402a; }
+    .gb-summary-text small { display: block; margin-top: 6px; font-size: .78rem; color: var(--muted); }
     .gb-item { position: relative; }
     .gb-delete {
       position: absolute; top: 14px; right: 14px;
@@ -399,8 +414,14 @@
           <button type="submit" class="btn btn-primary" id="gb-submit">送出留言</button>
           <p class="gb-status" id="gb-status" role="status"></p>
         </form>
-        <div class="gb-list" id="gb-list" aria-live="polite">
-          <p class="gb-empty">留言載入中…</p>
+        <div>
+          <div class="gb-summary">
+            <button type="button" class="btn gb-summary-btn" id="gb-summary-btn">✨ AI 一句話總結</button>
+            <p class="gb-summary-text" id="gb-summary-text" role="status" hidden></p>
+          </div>
+          <div class="gb-list" id="gb-list" aria-live="polite">
+            <p class="gb-empty">留言載入中…</p>
+          </div>
         </div>
       </div>
     </div>
@@ -434,7 +455,9 @@
     /* ---------- Guestbook ---------- */
     // On Vercel the API is same-origin; the GitHub Pages copy calls the Vercel deployment.
     const VERCEL_ORIGIN = "https://my-first-site-lake-seven.vercel.app";
-    const API_URL = (location.hostname.endsWith("github.io") ? VERCEL_ORIGIN : "") + "/api/messages";
+    const API_BASE = location.hostname.endsWith("github.io") ? VERCEL_ORIGIN : "";
+    const API_URL = API_BASE + "/api/messages";
+    const SUMMARY_URL = API_BASE + "/api/summary";
 
     const gbForm = document.getElementById("gb-form");
     const gbList = document.getElementById("gb-list");
@@ -599,6 +622,36 @@
         setStatus(err.message === "Failed to fetch" ? "連線失敗，請稍後再試" : err.message, true);
       } finally {
         gbSubmit.disabled = false;
+      }
+    });
+
+    /* ---------- AI summary ---------- */
+    const summaryBtn = document.getElementById("gb-summary-btn");
+    const summaryText = document.getElementById("gb-summary-text");
+
+    function showSummary(text, isError = false, note = "") {
+      summaryText.replaceChildren(text);
+      if (note) {
+        const small = document.createElement("small");
+        small.textContent = note;
+        summaryText.append(small);
+      }
+      summaryText.classList.toggle("error", isError);
+      summaryText.hidden = false;
+    }
+
+    summaryBtn.addEventListener("click", async () => {
+      summaryBtn.disabled = true;
+      showSummary("AI 正在閱讀留言…");
+      try {
+        const res = await fetch(SUMMARY_URL, { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "總結失敗，請稍後再試");
+        showSummary(data.summary, false, "由 Claude AI 根據最新 50 則留言產生");
+      } catch (err) {
+        showSummary(err.message === "Failed to fetch" ? "連線失敗，請稍後再試" : err.message, true);
+      } finally {
+        summaryBtn.disabled = false;
       }
     });
 
