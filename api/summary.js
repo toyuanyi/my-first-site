@@ -38,6 +38,9 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "POST, OPTIONS");
     return res.status(405).json({ error: "Method not allowed" });
   }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: "AI 總結尚未設定完成" });
+  }
 
   try {
     await ensureTable();
