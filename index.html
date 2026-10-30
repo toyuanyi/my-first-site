@@ -417,7 +417,7 @@
 
     /* ---------- Guestbook ---------- */
     // On Vercel the API is same-origin; the GitHub Pages copy calls the Vercel deployment.
-    const VERCEL_ORIGIN = "";
+    const VERCEL_ORIGIN = "https://my-first-site-lake-seven.vercel.app";
     const API_URL = (location.hostname.endsWith("github.io") ? VERCEL_ORIGIN : "") + "/api/messages";
 
     const gbForm = document.getElementById("gb-form");
