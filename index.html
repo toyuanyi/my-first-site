@@ -208,6 +208,21 @@
     .gb-name { font-weight: 700; }
     .gb-time { font-size: .82rem; color: var(--muted); }
     .gb-text { color: var(--ink); word-break: break-word; white-space: pre-wrap; }
+    .gb-item { position: relative; }
+    .gb-delete {
+      position: absolute; top: 14px; right: 14px;
+      border: 1px solid var(--line); background: var(--bg); color: #b8402a;
+      font: inherit; font-size: .82rem; font-weight: 700;
+      padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s;
+    }
+    .gb-delete:hover { background: #b8402a; color: #fff; border-color: #b8402a; }
+    .gb-delete:disabled { opacity: .5; cursor: wait; }
+    .admin-on .gb-meta { padding-right: 64px; }
+    .admin-link {
+      background: none; border: none; font: inherit; color: var(--muted);
+      text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin-left: 8px; opacity: .7;
+    }
+    .admin-link:hover { opacity: 1; color: var(--accent); }
     .gb-empty {
       text-align: center; color: var(--muted); padding: 40px 24px;
       border: 2px dashed var(--line); border-radius: 20px;
@@ -403,6 +418,7 @@
 
   <footer>
     © <span id="year"></span> Christine · Made with ☕ &amp; 🧈
+    <button type="button" class="admin-link" id="admin-link">管理</button>
   </footer>
 
   <script>
@@ -468,7 +484,66 @@
 
       body.append(meta, text);
       item.append(avatar, body);
+
+      if (adminToken) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "gb-delete";
+        del.textContent = "刪除";
+        del.addEventListener("click", () => deleteMessage(m, del));
+        item.append(del);
+      }
       return item;
+    }
+
+    /* ---------- Admin (delete messages) ---------- */
+    // The password lives only in this browser; the server checks it against ADMIN_TOKEN.
+    const TOKEN_KEY = "gb-admin-token";
+    const adminLink = document.getElementById("admin-link");
+    let adminToken = null;
+    try { adminToken = localStorage.getItem(TOKEN_KEY); } catch {}
+
+    function setAdmin(token) {
+      adminToken = token;
+      try { token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY); } catch {}
+      document.body.classList.toggle("admin-on", !!token);
+      adminLink.textContent = token ? "登出管理" : "管理";
+    }
+    setAdmin(adminToken);
+
+    adminLink.addEventListener("click", async () => {
+      if (adminToken) { setAdmin(null); return loadMessages(); }
+      const token = prompt("請輸入管理密碼");
+      if (!token) return;
+      try {
+        const res = await fetch(API_URL + "?auth=check", { headers: { Authorization: "Bearer " + token } });
+        if (res.status !== 204) return alert("密碼不正確");
+        setAdmin(token);
+        await loadMessages();
+        document.getElementById("guestbook").scrollIntoView({ behavior: "smooth" });
+      } catch {
+        alert("連線失敗，請稍後再試");
+      }
+    });
+
+    async function deleteMessage(m, button) {
+      if (!confirm(`確定要刪除 ${m.name} 的留言嗎？\n\n「${m.message}」`)) return;
+      button.disabled = true;
+      try {
+        const res = await fetch(API_URL + "?id=" + encodeURIComponent(m.id), {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + adminToken },
+        });
+        if (res.status === 401) {
+          setAdmin(null);
+          alert("管理密碼已失效，請重新登入");
+        } else if (!res.ok && res.status !== 404) {
+          throw new Error(res.status);
+        }
+      } catch {
+        alert("刪除失敗，請稍後再試");
+      }
+      await loadMessages();
     }
 
     function showEmpty(text) {
